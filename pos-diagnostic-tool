@@ -1,0 +1,23 @@
+====================================
+POS Network & Database Diagnostic Tool
+======================================
+
+Network => ProbeResult{timestamp=2026-06-12T19:19:18.516847, latencyMs=0.74875, reachable=true, success=true}
+
+Database => DbResult{timestamp=2026-06-12T19:19:18.518978, dbConnectTimeMs=9.360292, queryTimeMs=1.069041, success=true}
+
+=================================================
+
+===== DIAGNOSTIC SUMMARY =====
+
+Total Samples: 30
+Min Latency (ms): 0.34
+Max Latency (ms): 1.05
+Average Latency (ms): 0.73
+Jitter (ms): 0.12
+Packet Loss (%): 0.00
+Average DB Connect Time (ms): 10.74
+Average DB Query Time (ms): 1.15
+Anomaly Count: 0
+
+Verdict: System operating normally.

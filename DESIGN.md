@@ -1,227 +1,177 @@
-# Design Document
+# Design Decisions
 
 ## Project Overview
 
-The POS Network & Database Diagnostic Tool is a Java 17 command-line application designed to diagnose connectivity and performance issues between a POS client machine and a central server hosting a PostgreSQL database.
+The POS Network & Database Diagnostic Tool was designed to help operators identify connectivity and database performance issues between a client POS terminal and a central POS server.
 
-The tool measures network performance, database responsiveness, packet loss, and latency statistics, then generates a summary report to help operators determine whether transaction delays are caused by network conditions or database performance.
-
----
-
-## Design Goals
-
-* Separation of concerns
-* Config-driven architecture
-* No hardcoded values
-* Easy maintenance and extension
-* Production-style error handling
-* Independent network and database diagnostics
+The primary goal was to provide measurable diagnostics rather than relying on assumptions when troubleshooting transaction delays, failed saves, or intermittent connectivity issues.
 
 ---
 
-## Architecture
+# Architecture
 
-The application follows a layered design where each class has a single responsibility.
+The application follows a modular architecture with clear separation of responsibilities.
 
-### Config Layer
+```text
+Main
+ │
+ ▼
+DiagnosticService
+ │
+ ├── NetworkProbe
+ ├── DatabaseProbe
+ ├── FileLogger
+ └── ReportGenerator
+```
 
-**ConfigLoader**
+---
 
-Responsible for loading configuration values from the application.properties file.
+# Design Decisions
 
-Configuration includes:
+## 1. Separation of Concerns
+
+Each component has a single responsibility.
+
+### ConfigLoader
+
+Loads configuration values from external configuration sources.
+
+### NetworkProbe
+
+Measures:
+
+* Host reachability
+* TCP connection latency
+* Network success/failure status
+
+### DatabaseProbe
+
+Measures:
+
+* PostgreSQL connection establishment time
+* Query execution time
+* Database availability
+
+### FileLogger
+
+Handles all file-based logging operations.
+
+### ReportGenerator
+
+Calculates statistics and generates summary reports.
+
+### DiagnosticService
+
+Coordinates the complete diagnostic workflow.
+
+---
+
+## 2. Configuration Externalization
+
+All configurable values are stored outside source code.
+
+Examples:
 
 * Network host
 * Network port
-* Timeouts
-* Probe intervals
-* Thresholds
-* Database connection details
+* Database credentials
+* Threshold values
+* Probe interval
+* Probe duration
+
+Reason:
+
+Avoid hardcoded environment-specific values.
 
 ---
 
-### Network Layer
+## 3. Independent Measurements
 
-**NetworkProbe**
+Network and database diagnostics are measured independently.
 
-Responsible for:
+Reason:
 
-* Reachability testing
-* TCP connection timing
-* Network latency measurement
-
-The implementation uses:
-
-* Socket
-* InetSocketAddress
-* InetAddress
-* System.nanoTime()
-
-The result is returned through a ProbeResult object.
+A network issue and a database issue may occur separately and should be reported independently.
 
 ---
 
-### Database Layer
+## 4. New Database Connection Per Probe
 
-**DatabaseProbe**
+A new PostgreSQL connection is created for every database probe.
 
-Responsible for:
+Reason:
 
-* PostgreSQL connectivity testing
-* JDBC connection timing
-* Query execution timing
+The objective is to measure connection establishment latency.
 
-A lightweight query:
-
-SELECT 1
-
-is executed to measure database round-trip performance.
-
-Results are returned through a DbResult object.
+Connection pooling would hide this metric and distort results.
 
 ---
 
-### Model Layer
+## 5. Threshold-Based Anomaly Detection
 
-The model layer contains simple POJO classes used to transfer data between components.
+Anomalies are generated when metrics exceed configurable thresholds.
 
-#### ProbeResult
+Examples:
 
-Stores:
+* High network latency
+* Slow database connection
+* Slow database query
 
-* Timestamp
-* Latency
-* Reachability
-* Success status
+Reason:
 
-#### DbResult
-
-Stores:
-
-* Connection time
-* Query execution time
-* Success status
-* Error information
-
-#### AnomalyEvent
-
-Stores:
-
-* Timestamp
-* Type
-* Message
-* Measured value
-* Threshold value
+Operators should be alerted only when values exceed expected operating ranges.
 
 ---
 
-### Service Layer
+## 6. Logging Strategy
 
-**DiagnosticService**
+All probe results and anomalies are written to timestamped log files.
 
-Acts as the orchestrator of the application.
+Reason:
 
-Responsibilities:
-
-* Load configuration
-* Execute probes
-* Store results
-* Detect anomalies
-* Trigger logging
-* Generate reports
-
-The service continuously executes probes at configurable intervals until the configured duration is reached.
+Provides historical evidence for troubleshooting and analysis.
 
 ---
 
-### Logging Layer
+## 7. Node.js Migration Decisions
 
-**FileLogger**
+During migration:
 
-Responsible for writing:
+* Java blocking operations were converted to async/await
+* JDBC was replaced with pg
+* application.properties was replaced with .env
+* Thread.sleep() was replaced with Promise-based delays
 
-* Probe results
-* Database results
-* Anomaly events
-* Summary reports
-
-to timestamped log files.
+The original workflow and reporting logic were preserved.
 
 ---
 
-### Reporting Layer
+# AI Features
 
-**ReportGenerator**
+## AI Root Cause Summary
 
-Calculates:
+Provides a plain-language explanation of probable causes based on collected metrics and anomalies.
 
-* Minimum latency
-* Maximum latency
-* Average latency
-* Jitter
-* Packet loss percentage
-* Average DB connection time
-* Average DB query time
-* Anomaly count
+## Natural Language Report
 
-and generates a final verdict.
+Converts technical statistics into a report suitable for a non-technical operator.
 
 ---
 
-## Execution Flow
+# Known Limitations
 
-1. Main starts the application.
-2. DiagnosticService is created.
-3. ConfigLoader loads configuration.
-4. NetworkProbe and DatabaseProbe are initialized.
-5. Probes run at the configured interval.
-6. Results are collected and logged.
-7. Threshold violations generate anomaly events.
-8. After the configured duration, a final report is generated.
-9. The report is displayed on the console and written to a log file.
+* Single host monitoring
+* PostgreSQL only
+* No graphical dashboard
+* No historical trend analysis
+* No alert notifications
 
 ---
 
-## Design Decisions
+# Future Enhancements
 
-### External Configuration
-
-All configuration values are stored outside the source code to avoid recompilation when environments change.
-
-### Constructor Injection
-
-Dependencies are passed through constructors rather than instantiated internally, reducing coupling between classes.
-
-### Result Objects
-
-ProbeResult and DbResult separate network metrics from database metrics, making reporting more accurate and maintainable.
-
-### Error Handling
-
-All network and database failures are handled gracefully without terminating the application.
-
----
-
-## Current Limitations
-
-* Single-threaded implementation
-* PostgreSQL-specific database support
-* Local file-based logging
-* Command-line interface only
-
----
-
-## Future Enhancements
-
-* Multi-threaded probe execution
 * Dashboard UI
-* Historical trend analysis
-* CSV/JSON export
-* AI-powered root-cause analysis
-* Support for additional databases
-
----
-
-## Conclusion
-
-The application follows clean object-oriented design principles, separates responsibilities across layers, externalizes configuration, and provides reliable network and database diagnostics for POS environments.
+* Email alerts
+* Multi-host monitoring
+* Historical reporting
+* Predictive anomaly detection
