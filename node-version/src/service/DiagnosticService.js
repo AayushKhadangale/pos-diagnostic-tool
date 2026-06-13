@@ -311,9 +311,10 @@ class DiagnosticService {
     catch (error) {
 
         console.error(
-            'AI Processing Failed:',
-            error.message
+            'AI Processing Failed:'
         );
+
+        console.error(error);
 
         this.aiRootCause =
             'AI root cause analysis unavailable.';
@@ -321,6 +322,7 @@ class DiagnosticService {
         this.operatorSummary =
             'Operator summary unavailable.';
     }
+
 }
 }
 
